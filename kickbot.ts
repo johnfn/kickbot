@@ -1,8 +1,13 @@
+// TODO
+// * daily leaderboard
+
 import Discord = require("discord.js")
 import { getChipsTossup } from "./chips_tossups"
 import { formatAnswer, isAnswerCorrect } from "./format_answer"
+import { loot, lootDescriptions, LootItem } from "./lootbox"
 import { getQuizDbQuestion } from "./quizdb"
 import configJson from "./token.json"
+import fs from "fs"
 
 const client = new Discord.Client()
 const config = {
@@ -36,14 +41,20 @@ const satisfiesCondition = (msg: Discord.Message, conditionCode: string) => {
   }
 }
 
+export const saveData: {
+  inventories: { [username: string]: LootItem[] }
+  scores: { [username: string]: number }
+} = JSON.parse(fs.readFileSync("save/save.json", "utf-8")) ?? {
+  inventories: [],
+  scores: [],
+}
+
 let playingTrivia = false
 let givenAnswer = ""
 let buzzQueue: {
   user: Discord.User
 }[] = []
 let buzzers: Discord.User[] = []
-
-let scores: { [username: string]: number } = {}
 
 // const reactWithNumber = async (message: Discord.Message, number: number) => {
 //   let strs = String(number).split("")
@@ -148,6 +159,7 @@ client.on(
       const officialAnswer = formatAnswer(question.answer)
       let remainingWords = fullText.split(" ")
       let partialAnswerText = ""
+      let correctAnswerer: Discord.User | undefined
 
       let count = 0
       buzzQueue = []
@@ -230,10 +242,13 @@ Next up is ${buzzQueue
           if (result === "correct") {
             await message.channel.send("Correct!")
 
-            scores[buzzQueue[0].user.username] =
-              (scores[buzzQueue[0].user.username] || 0) + pointsAwarded
+            saveData.scores[buzzQueue[0].user.username] =
+              (saveData.scores[buzzQueue[0].user.username] || 0) + pointsAwarded
+
+            fs.writeFileSync("save/save.json", JSON.stringify(saveData))
 
             someoneAnsweredCorrectly = true
+            correctAnswerer = buzzQueue[0].user
           } else if (result === "prompt") {
             await message.channel.send(`Prompt`)
           } else if (result === "prompt-of") {
@@ -269,15 +284,15 @@ Next up is ${buzzQueue
 
       let leaderboardMessage = answer + "\n\n**Leaderboard:**\n```"
 
-      for (const name of Object.keys(scores)) {
+      for (const name of Object.keys(saveData.scores)) {
         leaderboardMessage +=
           name +
           new Array(20 - name.length).fill(" ").join("") +
-          scores[name] +
+          saveData.scores[name] +
           " points.\n"
       }
 
-      if (Object.keys(scores).length === 0) {
+      if (Object.keys(saveData.scores).length === 0) {
         leaderboardMessage += "No leaderboard because you all suck."
       }
 
@@ -285,7 +300,57 @@ Next up is ${buzzQueue
 
       await message.channel.send(leaderboardMessage)
 
+      if (Math.random() > 0.9 && correctAnswerer) {
+        await loot(correctAnswerer, message.channel)
+      }
+
       playingTrivia = false
+    }
+
+    if (message.content.toLowerCase() === "!loottesting") {
+      await loot(message.author, message.channel)
+    }
+
+    if (message.content.toLowerCase() === "!inventory") {
+      const myInventory = saveData.inventories[message.author.username] ?? []
+      const myPoints = saveData.scores[message.author.username] ?? 0
+
+      if (myInventory.length === 0) {
+        await message.channel.send(
+          "Inventory:\n\n```" + `${myPoints} points` + "```"
+        )
+      } else {
+        await message.channel.send(
+          "Inventory:\n\n```" +
+            `${myPoints} points\n` +
+            myInventory.join("\n") +
+            "```\n\nInspect an item with `!inspect [item name]`."
+        )
+      }
+    }
+
+    if (message.content.toLowerCase().startsWith("!inspect")) {
+      const inspectedItem = message.content.split(" ").slice(1).join(" ")
+      const myInventory = saveData.inventories[message.author.username] ?? []
+
+      if (
+        !myInventory.find(
+          (item) => item.toLowerCase() === inspectedItem.toLowerCase()
+        )
+      ) {
+        await message.channel.send(
+          `You don't have an item named ${inspectedItem} in your inventory!\n\nUse \`!inventory\` to see the contents of your inventory.`
+        )
+        return
+      }
+
+      for (const [name, desc] of Object.entries(lootDescriptions)) {
+        if (name.toLowerCase() === inspectedItem.toLowerCase()) {
+          await message.channel.send(`\`${name}\`\n\n${desc}`)
+
+          return
+        }
+      }
     }
 
     if (message.content.toLowerCase().startsWith("buzz") && playingTrivia) {
@@ -386,10 +451,9 @@ Next up is ${buzzQueue
       message.content.length > 5
     ) {
       const words = message.content.split(" ")
-      const newName = words[1]
-      console.log(newName)
+      const newName = words[1] ?? ""
       try {
-        message.guild?.me?.setNickname(newName)
+        message.guild?.me?.setNickname(newName.slice(0, 31))
         const m = await message.channel.send(
           `hi ${message.author.username}! thanks for greeting me :slight_smile: `
         )
