@@ -8,6 +8,7 @@ import { loot, lootDescriptions, LootItem } from "./lootbox"
 import { getQuizDbQuestion } from "./quizdb"
 import configJson from "./token.json"
 import fs from "fs"
+import { handleRpgMessages, RpgRoomName } from "./rpg"
 
 const client = new Discord.Client()
 const config = {
@@ -41,12 +42,17 @@ const satisfiesCondition = (msg: Discord.Message, conditionCode: string) => {
   }
 }
 
-export const saveData: {
+export const persistentData: {
   inventories: { [username: string]: LootItem[] }
   scores: { [username: string]: number }
+  locations: { [username: string]: RpgRoomName }
 } = JSON.parse(fs.readFileSync("save/save.json", "utf-8")) ?? {
   inventories: [],
   scores: [],
+}
+
+export const save = () => {
+  fs.writeFileSync("save/save.json", JSON.stringify(persistentData))
 }
 
 let playingTrivia = false
@@ -84,6 +90,8 @@ client.on(
     }
 
     const msg = message.content
+
+    handleRpgMessages(message)
 
     for (const [emoji, code] of Object.entries(emojiToConditionCode)) {
       if (satisfiesCondition(message, code)) {
@@ -253,10 +261,11 @@ Next up is ${buzzQueue
           if (result === "correct") {
             await message.channel.send("Correct!")
 
-            saveData.scores[buzzQueue[0].user.username] =
-              (saveData.scores[buzzQueue[0].user.username] || 0) + pointsAwarded
+            persistentData.scores[buzzQueue[0].user.username] =
+              (persistentData.scores[buzzQueue[0].user.username] || 0) +
+              pointsAwarded
 
-            fs.writeFileSync("save/save.json", JSON.stringify(saveData))
+            save()
 
             someoneAnsweredCorrectly = true
             correctAnswerer = buzzQueue[0].user
@@ -295,15 +304,15 @@ Next up is ${buzzQueue
 
       let leaderboardMessage = answer + "\n\n**Leaderboard:**\n```"
 
-      for (const name of Object.keys(saveData.scores)) {
+      for (const name of Object.keys(persistentData.scores)) {
         leaderboardMessage +=
           name +
           new Array(20 - name.length).fill(" ").join("") +
-          saveData.scores[name] +
+          persistentData.scores[name] +
           " points.\n"
       }
 
-      if (Object.keys(saveData.scores).length === 0) {
+      if (Object.keys(persistentData.scores).length === 0) {
         leaderboardMessage += "No leaderboard because you all suck."
       }
 
@@ -323,8 +332,9 @@ Next up is ${buzzQueue
     }
 
     if (message.content.toLowerCase() === "!inventory") {
-      const myInventory = saveData.inventories[message.author.username] ?? []
-      const myPoints = saveData.scores[message.author.username] ?? 0
+      const myInventory =
+        persistentData.inventories[message.author.username] ?? []
+      const myPoints = persistentData.scores[message.author.username] ?? 0
 
       if (myInventory.length === 0) {
         await message.channel.send(
@@ -342,7 +352,8 @@ Next up is ${buzzQueue
 
     if (message.content.toLowerCase().startsWith("!inspect")) {
       const inspectedItem = message.content.split(" ").slice(1).join(" ")
-      const myInventory = saveData.inventories[message.author.username] ?? []
+      const myInventory =
+        persistentData.inventories[message.author.username] ?? []
 
       if (
         !myInventory.find(

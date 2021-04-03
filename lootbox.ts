@@ -1,5 +1,5 @@
 import Discord = require("discord.js")
-import { saveData } from "./kickbot"
+import { persistentData } from "./kickbot"
 import fs from "fs"
 
 export enum LootItem {
@@ -103,10 +103,10 @@ export const loot = async (
       `!\n\nInspect it: \`!inspect ${awardedItem}\`\nSee your inventory: \`!inventory\``
   )
 
-  saveData.inventories[winner.username] ??= []
-  saveData.inventories[winner.username].push(awardedItem)
+  persistentData.inventories[winner.username] ??= []
+  persistentData.inventories[winner.username].push(awardedItem)
 
-  fs.writeFileSync("save/save.json", JSON.stringify(saveData))
+  fs.writeFileSync("save/save.json", JSON.stringify(persistentData))
 
   return awardedItem
 }
