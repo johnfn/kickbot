@@ -56,10 +56,10 @@ const lookAtCurrentRoom = async (
   let fullDescription =
     `${justEntered ? "You enter the " : ""}**${roomName}**\n${
       room.description
-    }\n\n**Exits:**` +
+    }\n\n**Exits:**\n` +
     room.exits
       .map((roomName, i) => {
-        return `\`!enter :regional_indicator_${i + 1}\`: ${roomName}`
+        return `\`!enter ${i + 1}: ${roomName}`
       })
       .join("\n")
 
