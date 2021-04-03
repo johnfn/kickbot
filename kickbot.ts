@@ -130,7 +130,18 @@ client.on(
           "Looking up some trivia... hmm hm hum"
         )
 
-        const result = await getQuizDbQuestion(nums, message.channel)
+        let result: { points: number; json: string } | null = null
+        try {
+          result = await getQuizDbQuestion(nums, message.channel)
+        } catch (e) {
+          console.log(e)
+          await message.channel.send(
+            "There was a problem with the trivia db. Try doing !trivia again."
+          )
+          playingTrivia = false
+
+          return
+        }
 
         if (result === null) {
           await message.channel.send(
@@ -451,7 +462,8 @@ Next up is ${buzzQueue
       message.content.length > 5
     ) {
       const words = message.content.split(" ")
-      const newName = words[1] ?? ""
+      const newName = words.slice(1).join(" ") ?? ""
+
       try {
         message.guild?.me?.setNickname(newName.slice(0, 31))
         const m = await message.channel.send(
