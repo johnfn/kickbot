@@ -54,12 +54,12 @@ const lookAtCurrentRoom = async (
   const roomName = getRoom(message)
   const room = Rooms[roomName]
   let fullDescription =
-    `${justEntered ? "You enter the " : ""}**${roomName}**\n${
+    `${justEntered ? "You enter the " : ""}**${roomName}**.\n${
       room.description
     }\n\n**Exits:**\n` +
     room.exits
       .map((roomName, i) => {
-        return `\`!enter ${i + 1}: ${roomName}`
+        return `\`!enter ${i + 1}\`: ${roomName}`
       })
       .join("\n")
 
