@@ -109,7 +109,7 @@ export const handleRpgMessages = async (message: Discord.Message) => {
     lookAtCurrentRoom(message)
   }
 
-  if (message.content === "!kill") {
+  if (message.content.startsWith("!kill")) {
     const you = message.author.username
     const them = message.content.split(" ")[1]
 
