@@ -7,9 +7,14 @@ export enum RpgRoomName {
   "Outside Tavern" = "Outside Tavern",
 }
 
+export enum Action {
+  "Talk To Bartender" = "Talk To Bartender",
+}
+
 const Rooms: {
   [key in RpgRoomName]: {
     exits: RpgRoomName[]
+    actions?: Action[]
     description: string
   }
 } = {
@@ -23,6 +28,7 @@ const Rooms: {
     exits: [RpgRoomName["Tavern Upper Level"], RpgRoomName["Outside Tavern"]],
     description:
       "You're standing in a tavern. The room is spacious and filled with people chatting loudly - some of whom look a little drunk. A bartender stands behind the bar, and he catches your eye as if to ask if you want anything to drink. Further back, you see some stairs leading up.",
+    actions: [Action["Talk To Bartender"]],
   },
 
   "Tavern Upper Level": {
@@ -34,13 +40,11 @@ const Rooms: {
 
 const RPG_CHANNEL_ID = "827987425783316502"
 
-const getRoom = (message: Discord.Message) => {
-  let location: RpgRoomName | undefined =
-    persistentData.locations[message.author.username]
+const getRoomOf = (username: string) => {
+  let location: RpgRoomName | undefined = persistentData.locations[username]
 
   if (!location) {
-    location = persistentData.locations[message.author.username] =
-      RpgRoomName.Tavern
+    location = persistentData.locations[username] = RpgRoomName.Tavern
     save()
   }
 
@@ -51,7 +55,7 @@ const lookAtCurrentRoom = async (
   message: Discord.Message,
   justEntered = false
 ) => {
-  const roomName = getRoom(message)
+  const roomName = getRoomOf(message.author.username)
   const room = Rooms[roomName]
   let fullDescription =
     `${justEntered ? "You enter the " : ""}**${roomName}**.\n${
@@ -61,7 +65,13 @@ const lookAtCurrentRoom = async (
       .map((roomName, i) => {
         return `\`!enter ${i + 1}\`: ${roomName}`
       })
-      .join("\n")
+      .join("\n") +
+    (room.actions
+      ? "\n" +
+        room.actions.map((action, i) => {
+          return `\`!action ${i + 1}\`: ${action}`
+        })
+      : "")
 
   const msg = await message.channel.send(fullDescription)
 
@@ -76,7 +86,7 @@ export const handleRpgMessages = async (message: Discord.Message) => {
   // TODO: Use emoji reactions
   if (message.content.startsWith("!enter")) {
     const number = Number(message.content.split(" ")[1])
-    const roomName = getRoom(message)
+    const roomName = getRoomOf(message.author.username)
     const room = Rooms[roomName]
 
     const nextRoom = room.exits[number - 1]
@@ -97,5 +107,27 @@ export const handleRpgMessages = async (message: Discord.Message) => {
 
   if (message.content === "!look") {
     lookAtCurrentRoom(message)
+  }
+
+  if (message.content === "!kill") {
+    const you = message.author.username
+    const them = message.content.split(" ")[1]
+
+    const yourRoom = getRoomOf(you)
+    const theirRoom = getRoomOf(them)
+
+    if (yourRoom !== theirRoom) {
+      await message.channel.send(`You aren't in the same room as ${them}`)
+
+      return
+    }
+
+    const msg = await message.channel.send(
+      `**COMBAT START!** ${you} vs ${them}`
+    )
+
+    setTimeout(() => {
+      msg.edit("... JK combat is still WIP :slight_smile:")
+    }, 5000)
   }
 }
