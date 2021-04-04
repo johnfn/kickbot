@@ -10,17 +10,35 @@ dictionary(onLoadDictionary)
 
 let nspell: NSpell | undefined = undefined
 
-export const formatAnswer = (
-  ans: string
-): { answer: string; alternatives?: string[]; prompts?: string[] } => {
+export const attemptToNormalizeString = (ans: string): string => {
   ans = ans.toLowerCase()
-  ans = ans.split("[").join("")
-  ans = ans.split("]").join("")
-  ans = ans.split("(").join("")
-  ans = ans.split(")").join("")
+
+  // Remove any attribution
 
   if (ans.includes("&lt;")) {
     ans = ans.slice(0, ans.indexOf("&lt;")).trim()
+  }
+
+  if (ans.includes("&gt;")) {
+    ans = ans.slice(0, ans.indexOf("&gt;")).trim()
+  }
+
+  let lastSquareClose = ans.lastIndexOf("]")
+  let lastSquareOpen = ans.lastIndexOf("[")
+  let lastParenClose = ans.lastIndexOf(")")
+  let lastParenOpen = ans.lastIndexOf("(")
+
+  // Remove the last pair
+  if (lastParenClose !== -1 || lastSquareClose !== -1) {
+    if (lastParenClose > lastSquareClose) {
+      ans =
+        ans.substring(0, lastParenOpen) +
+        ans.substring(lastParenOpen).split("(").join("").split(")").join("")
+    } else {
+      ans =
+        ans.substring(0, lastSquareOpen) +
+        ans.substring(lastSquareOpen).split("[").join("").split("]").join("")
+    }
   }
 
   ans = ans.split("<strong>").join("")
@@ -30,17 +48,57 @@ export const formatAnswer = (
 
   ans = ans.trim()
 
+  ans = ans.replace("accept word forms;", "") // RIP
+  ans = ans.replace("accept word forms,", "") // RIP
   ans = ans.replace("accept answers like", "accept")
-  ans = ans.replace("also accept", "accept")
-  ans = ans.replace("before read", "")
+  ans = ans.replace(/also accept/g, "accept")
+  ans = ans.replace(/before read/g, "")
   ans = ans.replace("do not accept or prompt", "DNA")
+  ans = ans.replace(/ or/g, " accept")
+  ans = ans.replace(/or /g, "accept ")
   ans = ans.replace("do not accept", "DNA")
 
   // Yes, they are different!!!
   ans = ans.replace(/“/g, "")
   ans = ans.replace(/”/g, "")
 
-  ans = ans.replace("prompt on", "prompt")
+  ans = ans.replace(/"/g, "")
+  ans = ans.replace(/  /g, " ")
+  ans = ans.replace(/;/g, "")
+
+  ans = ans.replace(/prompt on/g, "prompt")
+
+  // just ignore "before xxx" entirely.
+  // i need some test cases here
+
+  const words = ans.split(" ")
+  ans = ""
+  let before = false
+
+  for (const word of words) {
+    if (word === "before") {
+      before = true
+      continue
+    }
+
+    if (word === "accept" || word === "prompt") {
+      before = false
+    }
+
+    if (!before) {
+      ans += word + " "
+    }
+  }
+
+  ans = ans.trim()
+
+  return ans
+}
+
+export const formatAnswer = (
+  ans: string
+): { answer: string; alternatives?: string[]; prompts?: string[] } => {
+  ans = attemptToNormalizeString(ans)
 
   let alternatives: string[] = []
   let prompts: string[] = []
@@ -49,32 +107,24 @@ export const formatAnswer = (
 
   let words = ans.split(" ")
 
-  let before = false
-
   for (let i = 0; i < words.length; i++) {
     const word = words[i]
     const nextWord = words[i + 1]
 
-    if (word === "or") {
+    if (word === "or" || word === "accept") {
       mode = "alts"
       continue
     }
 
-    if (word === "before") {
-      before = true
-    }
-
-    if (!before) {
-      if (
-        word.endsWith(";") ||
-        word.endsWith(":") ||
-        word.endsWith(",") ||
-        word.endsWith(".")
-      ) {
-        currentPhrase += " " + word.slice(0, -1)
-      } else {
-        currentPhrase += " " + word
-      }
+    if (
+      word.endsWith(";") ||
+      word.endsWith(":") ||
+      word.endsWith(",") ||
+      word.endsWith(".")
+    ) {
+      currentPhrase += " " + word.slice(0, -1)
+    } else {
+      currentPhrase += " " + word
     }
 
     // done with current segment?
@@ -83,7 +133,6 @@ export const formatAnswer = (
       word.endsWith(":") ||
       word.endsWith(",") ||
       word.endsWith(".") ||
-      nextWord === "or" ||
       nextWord === "accept" ||
       nextWord === "prompt" ||
       nextWord === "DNA" ||
@@ -95,7 +144,6 @@ export const formatAnswer = (
         prompts.push(currentPhrase.trim())
       }
 
-      before = false
       currentPhrase = ""
     }
 
@@ -390,6 +438,8 @@ function onLoadDictionary(err: any, dict: any) {
   test("North Dakota", "South Dakota", "no")
   test("Eiffel", "effiel")
 
+  test("C(live) S(taples) Lewis", "C S Lewis")
+
   // test("Mario Vargas Llosa", "vargas llosa")
 }
 
@@ -425,108 +475,316 @@ function onLoadDictionary(err: any, dict: any) {
 
 // was:Lewis &amp; Clark Expedition (accept equivalents, both names required)
 
-// let answers = [
-//   "Answer: The Legend of Zelda [prompt on Zelda]",
-//   "Answer: C(live) S(taples) Lewis (prompt on “Lewis” alone)",
-//   "Oroonoko: or, the Royal Slave",
-//   // "RNAs [or ribonucleic acids; prompt on nucleic acids; accept tRNAs or transfer RNAs or",
-//   // "Jerome David Salinger",
-//   // "Pulsars",
-//   // "The Hunchback of Notre Dame [or Notre-Dame de Paris]",
-//   // "cows",
-//   // "Artemis [accept Diana] &lt;Mythology — Dai&gt; [Ed. French]",
-//   // "alcohols",
-//   // "fluorine [accept F before read]",
-//   // "George Corley Wallace Jr.",
-//   // "Supreme Court justice [prompt on “justice”] &lt;AB&gt;",
-//   // "apples [accept golden apples]",
-//   // 'small intestine [accept ileum before "chyme" is read]',
-//   // "Hera",
-//   // "spinal cord",
-//   // "Indonesia",
-//   // "Sandro Botticelli [or Alessandro di Mariano di Vanni Filipepi]",
-//   // "Battle of Trafalgar &lt;JG, European/British History&gt;",
-//   // 'neoconservatism [accept word forms; do not accept or prompt on "conservatism"]',
-//   // "Egypt",
-//   // "Constantine I [accept Constantine the Great; prompt on Constantine] &lt;Other History, DC&gt;&lt;ed. AH&gt;",
-//   // "Francisco JosÃ© de Goya y Lucientes",
-//   // "function [or method; or procedure; or subroutine]",
-//   // "Winston Leonard Spencer-Churchill",
-//   // "volume &lt;MS&gt;",
-//   // "Colorado",
-//   // "The Fray",
-//   // "Charlotte Bronte [accept Currer Bell]",
-//   // "Emily Elizabeth Dickinson",
-//   // "seeds [prompt on embryos; prompt on fruit] &lt;JR&gt;",
-//   // "The Ring Cycle [or The Ring of the Nibelungs; or Der Ring des Nibelungen]",
-//   // "Joan of Arc or Jeanne d'Arc",
-//   // "Stanley Milgram",
-//   // "The Republic [or Politeia]",
-//   // "Humphrey DeForest Bogart",
-//   // "Electrons",
-//   // "I and the Village",
-//   // "Paradise Lost",
-//   // "Mexico [or United Mexican States; or Estados Unidos Mexicanos]",
-//   // "the square root of 674 units",
-//   // "United Kingdom [or Great Britain]",
-//   // "Night of the Long Knives [or Nacht der langen Messer]",
-//   // "Wales [or Cymru]",
-//   // "Uranus",
-//   // "Jean Jacques Rousseau",
-//   // "Seven Years' War",
-//   // "Heisenberg uncertainty principle",
-//   // "mantle",
-//   // "Plato [or Platon] &lt;JR&gt;",
-//   // "Benjamin Harrison [prompt on Harrison]",
-//   // "Benito Pablo Juarez",
-//   // '"To Althea, From Prison"',
-//   // "confession [accept answers like penance or penitential acts; accept reconciliation; accept word forms like I confess; accept confiteor] &lt;MK&gt;",
-//   // "John Galbraith &lt;Social Science, AK&gt;&lt;ed. AH&gt;",
-//   // "Mikhail Gorbachev [or Mikhail Sergeyevich Gorbachev] &lt;JL, European History&gt;",
-//   // "Jonathan Swift &lt;KT&gt;",
-//   // "Diego (RodrÃ­guez de Silva y) VelÃ¡zquez",
-//   // "Garden of Eden (also accept Garden of God or Garden of Yahweh)",
-//   // "Tokugawa Ieyasu [accept in either order; accept Tosho Daigongen; accept Matsudaira Takechiyo]",
-//   // "Parasitism [accept word forms]",
-//   // "Werner Herzog &lt;IKD&gt;",
-//   // "English Civil War",
-//   // "nerve cell or neuron",
-//   // "distillation",
-//   // "Ming Dynasty",
-//   // "Honore de Balzac",
-//   // "Carl Jung",
-//   // 'iambs [or iambus; or iambic verse; do not accept "iambic pentameter" or "blank verse";',
-//   // "Aaron Copland",
-//   // "La Boheme",
-//   // "Boston, Massachusetts",
-//   // " Calvin (prompt on Tracer Bullet, Stupendous Man, or Spaceman Spiff before mentioned)",
-//   // 'poliomyelitis (prompt on "infantile paralysis")',
-//   // "Sandro Botticelli [or Alessandro di Mariano Filipepi]",
-//   // "Things Fall Apart &lt;MS&gt;",
-//   // "Hera [or Juno]",
-//   // "double displacement reactions [or double replacement reactions]",
-//   // "Nicolaus Copernicus [or Mikolaj Kopernik; or Nikolaus Kopernikus; or Nicolas Copernico]",
-//   // "Siddhartha &lt;RP&gt;",
-//   // "The Panama Papers &lt;AN&gt; BONUSES",
-//   // "Confucius [or Kong Fuzi; or Kong Qui; or Kongzi] &lt;EA, Philosophy&gt;",
-//   // "Arthur  Miller",
-//   // "John Greenleaf Whittier",
-//   // "M.C. Escher",
-//   // "magnetic field (accept B-field or H-field, prompt on “B” or “H”)",
-//   // "Chromatography",
-//   // 'limerick (do not accept "poem", as they existed well before the 13th century)',
-//   // "John Irving",
-//   // "Mali Empire",
-//   // "complex conjugate &lt;Math — French&gt; [Edited]",
-//   // "Apple Inc. (prompt on FoxConn if they buzz in the first sentence) &lt;DA&gt;",
-//   // "Mollusca [or mollusks]",
-//   // "Faust",
-//   // "Spanish Armada [or Grande y Felicicima Armada; accept Great and Most Fortunate Navy][JoC]",
-//   // "Ali [or Ali ibn Abi Talib]",
-//   // "Emily Dickinson",
-//   // "Marlon Brando Jr.",
-//   // "protons",
-//   // "Eero Saarinen",
-//   // "zero [accept zeroth law of thermodynamics; accept absolute zero] &lt;AF/JR&gt;",
-//   // "Watergate Hotel",
-// ]
+const eqOrThrow = (a: string, b: string) => {
+  if (a && b && a.toLowerCase().trim() !== b.toLowerCase().trim()) {
+    console.log(a)
+    console.log(b)
+    throw new Error("not equal, got: " + a)
+  }
+}
+
+eqOrThrow(
+  attemptToNormalizeString(
+    "RNAs [or ribonucleic acids; prompt on nucleic acids; accept tRNAs or transfer RNAs or]"
+  ),
+  "RNAs accept ribonucleic acids prompt nucleic acids accept tRNAs accept transfer RNAs accept"
+)
+eqOrThrow(
+  attemptToNormalizeString("Jerome David Salinger"),
+  "Jerome David Salinger"
+)
+eqOrThrow(attemptToNormalizeString("Pulsars"), "pulsars")
+eqOrThrow(
+  attemptToNormalizeString(
+    "The Hunchback of Notre Dame [or Notre-Dame de Paris]"
+  ),
+
+  "The Hunchback of Notre Dame accept Notre-Dame de Paris"
+)
+eqOrThrow(attemptToNormalizeString("cows"), "cows")
+eqOrThrow(
+  attemptToNormalizeString(
+    "Artemis [accept Diana] &lt;Mythology — Dai&gt; [Ed. French]"
+  ),
+  "Artemis accept diana"
+)
+eqOrThrow(attemptToNormalizeString("alcohols"), "alcohols")
+
+eqOrThrow(
+  attemptToNormalizeString("fluorine [accept F before read]"),
+  "fluorine accept f"
+)
+
+eqOrThrow(
+  attemptToNormalizeString("George Corley Wallace Jr."),
+  "george corley wallace jr."
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    "Supreme Court justice [prompt on “justice”] &lt;AB&gt;"
+  ),
+  "Supreme Court justice prompt justice"
+)
+eqOrThrow(
+  attemptToNormalizeString("apples [accept golden apples]"),
+  "apples accept golden apples"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    'small intestine [accept ileum before "chyme" is read]'
+  ),
+  "small intestine accept ileum"
+)
+eqOrThrow(attemptToNormalizeString("Hera"), "hera")
+eqOrThrow(attemptToNormalizeString("spinal cord"), "spinal cord")
+eqOrThrow(attemptToNormalizeString("Indonesia"), "indonesia")
+eqOrThrow(
+  attemptToNormalizeString(
+    "Sandro Botticelli [or Alessandro di Mariano di Vanni Filipepi]"
+  ),
+  "Sandro Botticelli accept Alessandro di Mariano di Vanni Filipepi"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    "Battle of Trafalgar &lt;JG, European/British History&gt;"
+  ),
+  "Battle of Trafalgar"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    'neoconservatism [accept word forms; do not accept or prompt on "conservatism"]'
+  ),
+  "neoconservatism DNA on conservatism"
+)
+eqOrThrow(attemptToNormalizeString("Egypt"), "egypt")
+eqOrThrow(
+  attemptToNormalizeString(
+    "Constantine I [accept Constantine the Great; prompt on Constantine] &lt;Other History, DC&gt;&lt;ed. AH&gt;"
+  ),
+  "Constantine I accept Constantine the Great prompt Constantine"
+)
+eqOrThrow(
+  attemptToNormalizeString("Francisco JosÃ© de Goya y Lucientes"),
+  "Francisco JosÃ© de Goya y Lucientes"
+)
+eqOrThrow(
+  attemptToNormalizeString("function [or method; or procedure; or subroutine]"),
+  "function accept method accept procedure accept subroutine"
+)
+eqOrThrow(
+  attemptToNormalizeString("Winston Leonard Spencer-Churchill"),
+  "Winston Leonard Spencer-Churchill"
+)
+eqOrThrow(attemptToNormalizeString("volume &lt;MS&gt;"), "volume")
+eqOrThrow(attemptToNormalizeString("Colorado"), "Colorado")
+eqOrThrow(attemptToNormalizeString("The Fray"), "The Fray")
+eqOrThrow(
+  attemptToNormalizeString("Charlotte Bronte [accept Currer Bell]"),
+  "Charlotte Bronte accept Currer Bell"
+)
+eqOrThrow(
+  attemptToNormalizeString("Emily Elizabeth Dickinson"),
+  "Emily Elizabeth Dickinson"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    "seeds [prompt on embryos; prompt on fruit] &lt;JR&gt;"
+  ),
+  "seeds prompt embryos prompt fruit"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    "The Ring Cycle [or The Ring of the Nibelungs; or Der Ring des Nibelungen]"
+  ),
+  "The Ring Cycle accept The Ring of the Nibelungs accept Der Ring des Nibelungen"
+)
+
+eqOrThrow(
+  attemptToNormalizeString("Joan of Arc or Jeanne d'Arc"),
+  "Joan of Arc accept Jeanne d'Arc"
+)
+eqOrThrow(attemptToNormalizeString("Stanley Milgram"), "Stanley Milgram")
+eqOrThrow(
+  attemptToNormalizeString("The Republic [or Politeia]"),
+  "The Republic accept Politeia"
+)
+eqOrThrow(
+  attemptToNormalizeString("Humphrey DeForest Bogart"),
+  "Humphrey DeForest Bogart"
+)
+eqOrThrow(attemptToNormalizeString("Electrons"), "Electrons")
+eqOrThrow(attemptToNormalizeString("I and the Village"), "I and the Village")
+eqOrThrow(attemptToNormalizeString("Paradise Lost"), "Paradise Lost")
+
+eqOrThrow(
+  attemptToNormalizeString(
+    "Mexico [or United Mexican States; or Estados Unidos Mexicanos]"
+  ),
+  "Mexico accept United Mexican States accept Estados Unidos Mexicanos"
+)
+eqOrThrow(
+  attemptToNormalizeString("the square root of 674 units"),
+  "the square root of 674 units"
+)
+eqOrThrow(
+  attemptToNormalizeString("United Kingdom [or Great Britain]"),
+  "United Kingdom accept Great Britain"
+)
+eqOrThrow(
+  attemptToNormalizeString(
+    "Night of the Long Knives [or Nacht der langen Messer]"
+  ),
+  "Night of the Long Knives accept Nacht der langen Messer"
+)
+
+eqOrThrow(attemptToNormalizeString("Wales [or Cymru]"), "Wales accept Cymru")
+eqOrThrow(attemptToNormalizeString("Uranus"), "Uranus")
+eqOrThrow(
+  attemptToNormalizeString("Jean Jacques Rousseau"),
+  "Jean Jacques Rousseau"
+)
+eqOrThrow(attemptToNormalizeString("Seven Years' War"), "Seven Years' War")
+eqOrThrow(
+  attemptToNormalizeString("Heisenberg uncertainty principle"),
+  "Heisenberg uncertainty principle"
+)
+eqOrThrow(attemptToNormalizeString("mantle"), "mantle")
+eqOrThrow(
+  attemptToNormalizeString("Plato [or Platon] &lt;JR&gt;"),
+  "Plato accept Platon"
+)
+eqOrThrow(
+  attemptToNormalizeString("Benjamin Harrison [prompt on Harrison]"),
+  "Benjamin Harrison prompt Harrison"
+)
+eqOrThrow(
+  attemptToNormalizeString("Benito Pablo Juarez"),
+  "Benito Pablo Juarez"
+)
+eqOrThrow(
+  attemptToNormalizeString('"To Althea, From Prison"'),
+  "To Althea, From Prison"
+)
+
+eqOrThrow(
+  attemptToNormalizeString("Blah (Blee) Blah (Blu blu)"),
+  "Blah (Blee) Blah blu blu"
+)
+
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "confession [accept answers like penance or penitential acts; accept reconciliation; accept word forms like I confess; accept confiteor] &lt;MK&gt;"
+//   )
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "John Galbraith &lt;Social Science, AK&gt;&lt;ed. AH&gt;"
+//   )
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Mikhail Gorbachev [or Mikhail Sergeyevich Gorbachev] &lt;JL, European History&gt;"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Jonathan Swift &lt;KT&gt;"))
+// eqOrThrow(attemptToNormalizeString("Diego (RodrÃ­guez de Silva y) VelÃ¡zquez"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Garden of Eden (also accept Garden of God or Garden of Yahweh)"
+//   )
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Tokugawa Ieyasu [accept in either order; accept Tosho Daigongen; accept Matsudaira Takechiyo]"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Parasitism [accept word forms]"))
+// eqOrThrow(attemptToNormalizeString("Werner Herzog &lt;IKD&gt;"))
+// eqOrThrow(attemptToNormalizeString("English Civil War"))
+// eqOrThrow(attemptToNormalizeString("nerve cell or neuron"))
+// eqOrThrow(attemptToNormalizeString("distillation"))
+// eqOrThrow(attemptToNormalizeString("Ming Dynasty"))
+// eqOrThrow(attemptToNormalizeString("Honore de Balzac"))
+// eqOrThrow(attemptToNormalizeString("Carl Jung"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     'iambs [or iambus; or iambic verse; do not accept "iambic pentameter" or "blank verse";'
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Aaron Copland"))
+// eqOrThrow(attemptToNormalizeString("La Boheme"))
+// eqOrThrow(attemptToNormalizeString("Boston, Massachusetts"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     " Calvin (prompt on Tracer Bullet, Stupendous Man, or Spaceman Spiff before mentioned)"
+//   )
+// )
+// eqOrThrow(
+//   attemptToNormalizeString('poliomyelitis (prompt on "infantile paralysis")')
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Sandro Botticelli [or Alessandro di Mariano Filipepi]"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Things Fall Apart &lt;MS&gt;"))
+// eqOrThrow(attemptToNormalizeString("Hera [or Juno]"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "double displacement reactions [or double replacement reactions]"
+//   )
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Nicolaus Copernicus [or Mikolaj Kopernik; or Nikolaus Kopernikus; or Nicolas Copernico]"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Siddhartha &lt;RP&gt;"))
+// eqOrThrow(attemptToNormalizeString("The Panama Papers &lt;AN&gt; BONUSES"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Confucius [or Kong Fuzi; or Kong Qui; or Kongzi] &lt;EA, Philosophy&gt;"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Arthur  Miller"))
+// eqOrThrow(attemptToNormalizeString("John Greenleaf Whittier"))
+// eqOrThrow(attemptToNormalizeString("M.C. Escher"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "magnetic field (accept B-field or H-field, prompt on “B” or “H”)"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Chromatography"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     'limerick (do not accept "poem", as they existed well before the 13th century)'
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("John Irving"))
+// eqOrThrow(attemptToNormalizeString("Mali Empire"))
+// eqOrThrow(
+//   attemptToNormalizeString("complex conjugate &lt;Math — French&gt; [Edited]")
+// )
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Apple Inc. (prompt on FoxConn if they buzz in the first sentence) &lt;DA&gt;"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Mollusca [or mollusks]"))
+// eqOrThrow(attemptToNormalizeString("Faust"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "Spanish Armada [or Grande y Felicicima Armada; accept Great and Most Fortunate Navy][JoC]"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Ali [or Ali ibn Abi Talib]"))
+// eqOrThrow(attemptToNormalizeString("Emily Dickinson"))
+// eqOrThrow(attemptToNormalizeString("Marlon Brando Jr."))
+// eqOrThrow(attemptToNormalizeString("protons"))
+// eqOrThrow(attemptToNormalizeString("Eero Saarinen"))
+// eqOrThrow(
+//   attemptToNormalizeString(
+//     "zero [accept zeroth law of thermodynamics; accept absolute zero] &lt;AF/JR&gt;"
+//   )
+// )
+// eqOrThrow(attemptToNormalizeString("Watergate Hotel"))
