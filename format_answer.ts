@@ -360,9 +360,6 @@ export const isAnswerCorrect = (
     if (result === "prompt" && bestResult === "no") bestResult = "prompt"
   }
 
-  console.log(bestResult)
-  console.log(official)
-
   for (let prompt of prompts) {
     if (arePhrasesRoughlyEqual(given, prompt) === "correct") {
       if (bestResult === "no") bestResult = "prompt"
@@ -370,7 +367,7 @@ export const isAnswerCorrect = (
   }
 
   for (let candidateAnswer of officialAnswers) {
-    if (candidateAnswer.startsWith(given)) {
+    if (candidateAnswer.startsWith(given + " ")) {
       if (candidateAnswer.startsWith(given.trim() + " of")) {
         // prompt-of ovverrides all
         bestResult = "prompt-of"
@@ -495,9 +492,16 @@ function onLoadDictionary(err: any, dict: any) {
   test("neutron", "neutrino", "no")
   test("Franz (Uri) Boas", "Franz Boas")
 
-  // test("Franz (Uri) Boas", "Fr", "no")
+  test("speed of light [accept c before mentioned]", "c", "correct")
+  test("speed of light [accept c before mentioned]", "f", "no")
 
-  // test("Mario Vargas Llosa", "vargas llosa")
+  test("speed of light [accept c before mentioned]", "s", "no")
+
+  test("Franz (Uri) Boas", "Fr", "no")
+
+  test("Mario Vargas Llosa", "vargas llosa")
+  test("Mario Vargas Llosa", "vargas ", "prompt")
+  test("Mario Vargas Llosa", "vargas blah", "prompt")
 }
 
 // neutron should not be accepted for neutrino
