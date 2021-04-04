@@ -502,6 +502,11 @@ function onLoadDictionary(err: any, dict: any) {
   test("Mario Vargas Llosa", "vargas llosa")
   test("Mario Vargas Llosa", "vargas ", "prompt")
   test("Mario Vargas Llosa", "vargas blah", "prompt")
+
+  test("Japanese-Americans", "Japanese", "prompt")
+  test("Japanese-Americans", "Japanese americans")
+
+  // test("Syrian Arab Republic", "Syria", "correct")
 }
 
 // neutron should not be accepted for neutrino
