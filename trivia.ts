@@ -131,6 +131,8 @@ export const handleTriviaMessages = async (message: Discord.Message) => {
         partialAnswerText += remainingWords.shift() + " "
       }
 
+      await questionMessage.edit(partialAnswerText)
+
       await sleep(1500)
 
       for (const buzzer of buzzQueue) {
