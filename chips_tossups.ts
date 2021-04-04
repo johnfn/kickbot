@@ -38,7 +38,7 @@ let chipsTossups = [
       tossups: [
         {
           formatted_text: `This Chips Compo user has submitted many, many entries to the site, including "Quest for the Cryptic Chip" to Chips Compo 6. This user posted 'Anyone else listening to this in 2021?' as a comment to the song Crazy Colors. This musician was the author of "The Jester Affair". For 10 points, name this musician on Chips Compo with the most experience of anyone on the site.`,
-          answer: "BlueOceans",
+          answer: "BlueOceans accept everratic",
         },
       ],
     },

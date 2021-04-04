@@ -103,9 +103,12 @@ export const attemptToNormalizeString = (ans: string): string => {
   return "accept " + ans
 }
 
-export const formatAnswer = (
-  ans: string
-): { answers: string[]; prompts?: string[] } => {
+export type OfficialAnswer = {
+  answers: string[]
+  prompts?: string[]
+}
+
+export const formatAnswer = (ans: string): OfficialAnswer => {
   ans = attemptToNormalizeString(ans)
 
   let alternatives: string[] = []
@@ -513,8 +516,20 @@ function onLoadDictionary(err: any, dict: any) {
   test("Japanese-Americans", "Japanesesdf-americans", "prompt")
 
   test("the burning bush", "bush", "prompt")
+  test("Sir Isaac Newton", "isaac newton", "correct")
+  test(
+    "Brown v. Board of Education of Topeka, Kansas [or Board of Education of Topeka, Kansas v.",
+    "Brown v board of education",
+    "correct"
+  )
+  test("Georgia (Totto)  O’Keeffe", "Georgia O'keeffe")
+  // test(
+  //   "Brahma [do not accept or prompt on “Brahman” or “Brahmin”] &lt;EC&gt;",
+  //   "Brahman",
+  //   "no"
+  // )
 
-  test("Syrian Arab Republic", "Syria", "correct")
+  // test("Syrian Arab Republic", "Syria", "correct")
 }
 
 // neutron should not be accepted for neutrino
