@@ -213,23 +213,19 @@ const getAnswerFromTopBuzzedUser = async (
     getTickTockMessageText(8, buzzQueue[0].type)
   )
 
-  const result = await Promise.race([
-    new Promise<string | null>(async (resolve) => {
-      for (let i = 0; i < 4; i++) {
-        await sleep(2000)
+  const result = await new Promise<string | null>(async (resolve) => {
+    for (let i = 0; i < 4; i++) {
+      await sleep(2000)
 
-        tickTockMessage.edit(
-          getTickTockMessageText(8 - i * 2, buzzQueue[0].type)
-        )
+      tickTockMessage.edit(getTickTockMessageText(8 - i * 2, buzzQueue[0].type))
 
-        if (buzzQueue[0].answer) {
-          resolve(buzzQueue[0].answer)
-        }
+      if (buzzQueue[0].answer) {
+        return resolve(buzzQueue[0].answer)
       }
+    }
 
-      resolve(null)
-    }),
-  ])
+    resolve(null)
+  })
 
   if (result === null) {
     await tickTockMessage.edit("Time's up - no answer!")
