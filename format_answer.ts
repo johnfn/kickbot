@@ -282,7 +282,11 @@ export const isAnswerCorrect = (
       if (candidateAnswer.startsWith(given.trim() + " of")) {
         return "prompt-of"
       } else {
-        return "prompt"
+        if (candidateAnswer.split(" ").length >= 2) {
+          return "correct"
+        } else {
+          return "prompt"
+        }
       }
     }
   }
@@ -374,12 +378,14 @@ function onLoadDictionary(err: any, dict: any) {
     "no"
   )
 
-  test("New York City", "New York", "prompt")
+  test("Marcus Aurelius Antoninus Augustus", "marcus aurelius", "correct")
+
+  test("New York City", "New York", "correct")
 
   // (Great) Irish Potato Famine (accept any answer that describes hunger in Ireland related to bad potatoes, though "Irish" is not needed after "Ireland" is mentioned; prompt on partial answer)
 
   test("Static friction", "static")
-  test("New York City", "New York", "prompt")
+  test("New York City", "New York", "correct")
   test("Vice President of the United States", "Vice President", "prompt-of")
   test("North Dakota", "South Dakota", "no")
   test("Eiffel", "effiel")

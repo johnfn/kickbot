@@ -45,6 +45,7 @@ const getRoomOf = (username: string) => {
 
   if (!location) {
     location = persistentData.locations[username] = RpgRoomName.Tavern
+
     save()
   }
 
@@ -127,7 +128,7 @@ export const handleRpgMessages = async (message: Discord.Message) => {
     )
 
     setTimeout(() => {
-      msg.edit("... JK combat is still WIP :slight_smile:")
+      msg.edit("... JK combat is still WIP")
     }, 5000)
   }
 }

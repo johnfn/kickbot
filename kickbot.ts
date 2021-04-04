@@ -17,7 +17,7 @@ const config = {
 }
 
 client.on("ready", () => {
-  console.log(`Kickbot online.`)
+  console.log(`[${new Date().toDateString()}]Kickbot online.`)
 
   client.user!.setPresence({ activity: { name: ":eyes:" } })
 })
@@ -270,7 +270,13 @@ Next up is ${buzzQueue
             someoneAnsweredCorrectly = true
             correctAnswerer = buzzQueue[0].user
           } else if (result === "prompt") {
-            await message.channel.send(`Prompt`)
+            await message.channel.send(
+              `Give me more - buzz again with a more specific answer`
+            )
+
+            buzzers = buzzers.filter(
+              (user) => user.username !== message.author.username
+            )
           } else if (result === "prompt-of") {
             await message.channel.send(givenAnswer.trim() + " of ... ?")
           } else {
