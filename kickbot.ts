@@ -50,7 +50,7 @@ export const persistentData: {
 }
 
 export const save = () => {
-  fs.writeFileSync("save/save.json", JSON.stringify(persistentData))
+  fs.writeFileSync("save/save.json", JSON.stringify(persistentData, null, 2))
 }
 
 // const reactWithNumber = async (message: Discord.Message, number: number) => {
