@@ -17,7 +17,7 @@ const config = {
 }
 
 client.on("ready", () => {
-  console.log(`[${new Date().toDateString()}]Kickbot online.`)
+  console.log(`[${new Date().toString()}]Kickbot online.`)
 
   client.user!.setPresence({ activity: { name: ":eyes:" } })
 })
