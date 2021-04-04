@@ -503,8 +503,10 @@ function onLoadDictionary(err: any, dict: any) {
   test("Mario Vargas Llosa", "vargas ", "prompt")
   test("Mario Vargas Llosa", "vargas blah", "prompt")
 
-  test("Japanese-Americans", "Japanese", "prompt")
-  test("Japanese-Americans", "Japanese americans")
+  // test("Japanese-Americans", "Japanese", "prompt")
+  // test("Japanese-Americans", "Japanese americans")
+
+  // test("the burning bush", "bush")
 
   // test("Syrian Arab Republic", "Syria", "correct")
 }
