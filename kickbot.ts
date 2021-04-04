@@ -2,13 +2,11 @@
 // * daily leaderboard
 
 import Discord = require("discord.js")
-import { getChipsTossup } from "./chips_tossups"
-import { formatAnswer, isAnswerCorrect } from "./format_answer"
 import { loot, lootDescriptions, LootItem } from "./lootbox"
-import { getQuizDbQuestion } from "./quizdb"
 import configJson from "./token.json"
 import fs from "fs"
 import { handleRpgMessages, RpgRoomName } from "./rpg"
+import { handleTriviaMessages } from "./trivia"
 
 const client = new Discord.Client()
 const config = {
@@ -85,6 +83,7 @@ client.on(
     const msg = message.content
 
     handleRpgMessages(message)
+    await handleTriviaMessages(message)
 
     for (const [emoji, code] of Object.entries(emojiToConditionCode)) {
       if (satisfiesCondition(message, code)) {
