@@ -498,9 +498,9 @@ Next up is ${buzzQueue
 )
 
 const start = async () => {
-  if (process.env.NODE_APP_INSTANCE === "0") {
-    const c = await client.login(config.token)
-  }
+  // if (process.env.NODE_APP_INSTANCE === "0") {
+  const c = await client.login(config.token)
+  // }
 }
 
 start()
