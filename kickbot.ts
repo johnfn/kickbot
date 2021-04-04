@@ -140,15 +140,6 @@ client.on(
       }
     }
 
-    if (
-      playingTrivia &&
-      buzzQueue.length > 0 &&
-      message.author.username.toLowerCase() ===
-        buzzQueue[0].user.username.toLowerCase()
-    ) {
-      givenAnswer = message.content
-    }
-
     if (message.content.startsWith("!newcondition")) {
       let emoji = message.content.split(" ")[1]
 

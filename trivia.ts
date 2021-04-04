@@ -5,7 +5,7 @@ import { persistentData, save, sleep } from "./kickbot"
 import { loot } from "./lootbox"
 import { getQuizDbQuestion } from "./quizdb"
 
-let playingTrivia = false
+export let playingTrivia = false
 let buzzQueue: {
   user: Discord.User
   type: "buzz" | "prompt"
@@ -172,6 +172,15 @@ export const handleTriviaMessages = async (message: Discord.Message) => {
     }
 
     playingTrivia = false
+  }
+
+  if (
+    playingTrivia &&
+    buzzQueue.length > 0 &&
+    message.author.username.toLowerCase() ===
+      buzzQueue[0].user.username.toLowerCase()
+  ) {
+    buzzQueue[0].answer = message.content
   }
 
   if (message.content.toLowerCase().startsWith("buzz") && playingTrivia) {
