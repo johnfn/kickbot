@@ -271,7 +271,7 @@ Next up is ${buzzQueue
             correctAnswerer = buzzQueue[0].user
           } else if (result === "prompt") {
             await message.channel.send(
-              `Give me more - buzz again with a more specific answer`
+              `Close - buzz again with a more specific answer`
             )
 
             buzzers = buzzers.filter(

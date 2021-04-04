@@ -23,13 +23,18 @@ export const attemptToNormalizeString = (ans: string): string => {
     ans = ans.slice(0, ans.indexOf("&gt;")).trim()
   }
 
+  ans = ans.trim()
+
   let lastSquareClose = ans.lastIndexOf("]")
   let lastSquareOpen = ans.lastIndexOf("[")
   let lastParenClose = ans.lastIndexOf(")")
   let lastParenOpen = ans.lastIndexOf("(")
 
   // Remove the last pair
-  if (lastParenClose !== -1 || lastSquareClose !== -1) {
+  if (
+    (lastParenClose !== -1 || lastSquareClose !== -1) &&
+    (lastParenClose === ans.length - 1 || lastSquareClose === ans.length - 1)
+  ) {
     if (lastParenClose > lastSquareClose) {
       ans =
         ans.substring(0, lastParenOpen) +
@@ -92,12 +97,12 @@ export const attemptToNormalizeString = (ans: string): string => {
 
   ans = ans.trim()
 
-  return ans
+  return "accept " + ans
 }
 
 export const formatAnswer = (
   ans: string
-): { answer: string; alternatives?: string[]; prompts?: string[] } => {
+): { answers: string[]; prompts?: string[] } => {
   ans = attemptToNormalizeString(ans)
 
   let alternatives: string[] = []
@@ -177,8 +182,7 @@ export const formatAnswer = (
     .filter((a) => a.trim() !== "")
 
   return {
-    answer: ans,
-    alternatives: alternatives,
+    answers: alternatives,
     prompts: prompts,
   }
 }
@@ -221,8 +225,42 @@ const getEditDistance = (a: string, b: string) => {
   return matrix[b.length][a.length]
 }
 
-const equalOrMinorTypo = (given: string, answer: string) => {
-  // If they didnt spell it wrong, don't even try.
+const areWordsRoughlyEqual = (given: string, answer: string): boolean => {
+  if (answer.startsWith("(") && answer.endsWith(")")) {
+    // this is an optional word ... so sure whatever. YEE HAW
+
+    return true
+  }
+
+  if (answer.includes("(")) {
+    let shortAnswer = answer.slice(0, answer.indexOf("("))
+    let longAnswer = answer.replace("(", "").replace(")", "")
+
+    return (
+      areWordsRoughlyEqual(given, shortAnswer) ||
+      areWordsRoughlyEqual(given, longAnswer)
+    )
+  }
+
+  // Be generous with plurals
+
+  if (
+    given.endsWith("s") &&
+    !answer.endsWith("s") &&
+    areWordsRoughlyEqual(given.slice(0, -1), answer)
+  ) {
+    return true
+  }
+
+  if (
+    !given.endsWith("s") &&
+    answer.endsWith("s") &&
+    areWordsRoughlyEqual(answer.slice(0, -1), given)
+  ) {
+    return true
+  }
+
+  // If they didnt spell it wrong, don't even try to check spelling
   if (nspell?.correct(given)) {
     return given === answer
   }
@@ -238,108 +276,111 @@ const equalOrMinorTypo = (given: string, answer: string) => {
   )
 }
 
-export const areWordsRoughlyEqual = (given: string, answer: string) => {
+export const arePhrasesRoughlyEqual = (
+  given: string,
+  answer: string
+): "correct" | "prompt" | "no" => {
   const givenWords = given.split(" ")
   const answerWords = answer.split(" ")
 
   if (
     givenWords.length === answerWords.length &&
-    givenWords.every((w, i) => equalOrMinorTypo(givenWords[i], answerWords[i]))
+    givenWords.every((w, i) =>
+      areWordsRoughlyEqual(givenWords[i], answerWords[i])
+    )
   ) {
-    return true
+    return "correct"
   }
 
-  // Be generous with plurals
-
-  if (
-    given.endsWith("s") &&
-    !answer.endsWith("s") &&
-    equalOrMinorTypo(given.slice(0, -1), answer)
-  ) {
-    return true
+  if (areWordsRoughlyEqual("the " + given, answer)) {
+    return "correct"
   }
 
-  if (
-    !given.endsWith("s") &&
-    answer.endsWith("s") &&
-    equalOrMinorTypo(answer.slice(0, -1), given)
-  ) {
-    return true
+  if (areWordsRoughlyEqual(given, "the " + answer)) {
+    return "correct"
   }
 
-  if (equalOrMinorTypo("the " + given, answer)) {
-    return true
+  if (areWordsRoughlyEqual("a " + given, answer)) {
+    return "correct"
   }
 
-  if (equalOrMinorTypo(given, "the " + answer)) {
-    return true
+  if (areWordsRoughlyEqual(given, "a " + answer)) {
+    return "correct"
   }
 
-  if (equalOrMinorTypo("a " + given, answer)) {
-    return true
+  if (areWordsRoughlyEqual("an " + given, answer)) {
+    return "correct"
   }
 
-  if (equalOrMinorTypo(given, "a " + answer)) {
-    return true
+  if (areWordsRoughlyEqual(given, "an " + answer)) {
+    return "correct"
   }
 
-  if (equalOrMinorTypo("an " + given, answer)) {
-    return true
-  }
+  let numMatchingWords = 0
 
-  if (equalOrMinorTypo(given, "an " + answer)) {
-    return true
-  }
-
-  // For last names specifically
   for (const word of answer.split(" ")) {
-    if (equalOrMinorTypo(word, given)) {
-      return true
+    for (const givenWord of given.split(" ")) {
+      if (areWordsRoughlyEqual(word, givenWord)) {
+        numMatchingWords += 1
+      }
     }
   }
 
-  return false
+  if (
+    numMatchingWords >= 2 ||
+    (numMatchingWords === 1 && answer.split(" ").length === 1)
+  ) {
+    return "correct"
+  }
+
+  if (numMatchingWords === 1 && answer.split(" ").length > 1) {
+    return "prompt"
+  }
+
+  return "no"
 }
 
 export const isAnswerCorrect = (
   given: string,
   official: {
-    answer: string
-    alternatives?: string[] | undefined
+    answers: string[]
     prompts?: string[] | undefined
   }
 ): "correct" | "prompt" | "prompt-of" | "no" => {
   given = given.toLowerCase()
-  let officialAnswers = [official.answer, ...(official.alternatives ?? [])]
+  let officialAnswers = official.answers
   let prompts = official.prompts ?? []
 
+  let bestResult: "correct" | "prompt" | "prompt-of" | "no" = "no"
+
   for (let candidateAnswer of officialAnswers) {
-    if (areWordsRoughlyEqual(given, candidateAnswer)) {
-      return "correct"
-    }
+    let result = arePhrasesRoughlyEqual(given, candidateAnswer)
+
+    if (result === "correct") bestResult = "correct"
+    if (result === "prompt" && bestResult === "no") bestResult = "prompt"
   }
 
+  console.log(bestResult)
+  console.log(official)
+
   for (let prompt of prompts) {
-    if (areWordsRoughlyEqual(given, prompt)) {
-      return "prompt"
+    if (arePhrasesRoughlyEqual(given, prompt) === "correct") {
+      if (bestResult === "no") bestResult = "prompt"
     }
   }
 
   for (let candidateAnswer of officialAnswers) {
     if (candidateAnswer.startsWith(given)) {
       if (candidateAnswer.startsWith(given.trim() + " of")) {
-        return "prompt-of"
+        // prompt-of ovverrides all
+        bestResult = "prompt-of"
       } else {
-        if (candidateAnswer.split(" ").length >= 2) {
-          return "correct"
-        } else {
-          return "prompt"
-        }
+        if (bestResult === "no") bestResult = "prompt"
       }
     }
   }
 
-  return "no"
+  return bestResult
 }
 
 const test = (
@@ -365,6 +406,18 @@ function onLoadDictionary(err: any, dict: any) {
 
   nspell = NSpell(dict)
 
+  test(
+    "Jean Auguste Dominique <strong>Ingres</strong> &lt;Visual Arts, GY&gt;&lt;ed. AH&gt;",
+    "Jean",
+    "prompt"
+  )
+
+  test(
+    "capital punishment (or the death penalty, execution, or equivalents; prompt on lethal injection before mentioned)",
+    "lethal injection",
+    "prompt"
+  )
+
   test("Answer: The Legend of Zelda [prompt on Zelda]", "Legend of zelda")
   test("Answer: The Legend of Zelda [prompt on Zelda]", "The Legend of zelda")
   test("Answer: The Legend of Zelda [prompt on Zelda]", "Legend of zelda")
@@ -373,11 +426,11 @@ function onLoadDictionary(err: any, dict: any) {
   test("Artemis [accept Diana] &lt;Mythology — Dai&gt; [Ed. French]", "Diana")
   test(
     "Jean Auguste Dominique <strong>Ingres</strong> &lt;Visual Arts, GY&gt;&lt;ed. AH&gt;",
-    "Ingres"
+    "jean auguste dominique ingres"
   )
   test(
     "Jean Auguste Dominique <strong>Ingres</strong> &lt;Visual Arts, GY&gt;&lt;ed. AH&gt;",
-    "jean auguste dominique ingres"
+    "Jean Ingres"
   )
   test(
     "Answer: capital punishment (or the death penalty, execution, or equivalents; prompt on lethal injection before mentioned)",
@@ -390,11 +443,6 @@ function onLoadDictionary(err: any, dict: any) {
   test(
     "Answer: capital punishment (or the death penalty, execution, or equivalents; prompt on lethal injection before mentioned)",
     "execution"
-  )
-  test(
-    "Answer: capital punishment (or the death penalty, execution, or equivalents; prompt on lethal injection before mentioned)",
-    "lethal injection",
-    "prompt"
   )
 
   test(
@@ -432,13 +480,22 @@ function onLoadDictionary(err: any, dict: any) {
 
   // (Great) Irish Potato Famine (accept any answer that describes hunger in Ireland related to bad potatoes, though "Irish" is not needed after "Ireland" is mentioned; prompt on partial answer)
 
-  test("Static friction", "static")
+  test("Static friction", "static", "prompt")
   test("New York City", "New York", "correct")
   test("Vice President of the United States", "Vice President", "prompt-of")
-  test("North Dakota", "South Dakota", "no")
+  test("North Dakota", "South Dakota", "prompt") // TODO
   test("Eiffel", "effiel")
 
   test("C(live) S(taples) Lewis", "C S Lewis")
+  // test("C(live) S(taples) Lewis", "Stupid Dumb Lewis", "no")
+  test("C(live) S(taples) Lewis", "Lewis", "prompt")
+  test("C(live) S(taples) Lewis", "Clive Staples Lewis", "correct")
+  test("C(live) S(taples) Lewis (prompt on Lewis alone)", "C S Lewis")
+
+  test("neutron", "neutrino", "no")
+  test("Franz (Uri) Boas", "Franz Boas")
+
+  // test("Franz (Uri) Boas", "Fr", "no")
 
   // test("Mario Vargas Llosa", "vargas llosa")
 }
@@ -447,7 +504,6 @@ function onLoadDictionary(err: any, dict: any) {
 
 // test("Fyodor Dostoevsky", "Dostoyevsky")
 
-// "Answer: C(live) S(taples) Lewis (prompt on “Lewis” alone)",
 // "Oroonoko: or, the Royal Slave",
 
 // "Theodore "Teddy" Roosevelt (prompt on "Roosevelt" alone)"
@@ -487,188 +543,201 @@ eqOrThrow(
   attemptToNormalizeString(
     "RNAs [or ribonucleic acids; prompt on nucleic acids; accept tRNAs or transfer RNAs or]"
   ),
-  "RNAs accept ribonucleic acids prompt nucleic acids accept tRNAs accept transfer RNAs accept"
+  "accept RNAs accept ribonucleic acids prompt nucleic acids accept tRNAs accept transfer RNAs accept"
 )
 eqOrThrow(
   attemptToNormalizeString("Jerome David Salinger"),
-  "Jerome David Salinger"
+  "accept Jerome David Salinger"
 )
-eqOrThrow(attemptToNormalizeString("Pulsars"), "pulsars")
+eqOrThrow(attemptToNormalizeString("Pulsars"), "accept pulsars")
 eqOrThrow(
   attemptToNormalizeString(
     "The Hunchback of Notre Dame [or Notre-Dame de Paris]"
   ),
 
-  "The Hunchback of Notre Dame accept Notre-Dame de Paris"
+  "accept The Hunchback of Notre Dame accept Notre-Dame de Paris"
 )
-eqOrThrow(attemptToNormalizeString("cows"), "cows")
+eqOrThrow(attemptToNormalizeString("cows"), "accept cows")
 eqOrThrow(
   attemptToNormalizeString(
     "Artemis [accept Diana] &lt;Mythology — Dai&gt; [Ed. French]"
   ),
-  "Artemis accept diana"
+  "accept Artemis accept diana"
 )
-eqOrThrow(attemptToNormalizeString("alcohols"), "alcohols")
+eqOrThrow(attemptToNormalizeString("alcohols"), "accept alcohols")
 
 eqOrThrow(
   attemptToNormalizeString("fluorine [accept F before read]"),
-  "fluorine accept f"
+  "accept fluorine accept f"
 )
 
 eqOrThrow(
   attemptToNormalizeString("George Corley Wallace Jr."),
-  "george corley wallace jr."
+  "accept george corley wallace jr."
 )
 eqOrThrow(
   attemptToNormalizeString(
     "Supreme Court justice [prompt on “justice”] &lt;AB&gt;"
   ),
-  "Supreme Court justice prompt justice"
+  "accept Supreme Court justice prompt justice"
 )
 eqOrThrow(
   attemptToNormalizeString("apples [accept golden apples]"),
-  "apples accept golden apples"
+  "accept apples accept golden apples"
 )
 eqOrThrow(
   attemptToNormalizeString(
     'small intestine [accept ileum before "chyme" is read]'
   ),
-  "small intestine accept ileum"
+  "accept small intestine accept ileum"
 )
-eqOrThrow(attemptToNormalizeString("Hera"), "hera")
-eqOrThrow(attemptToNormalizeString("spinal cord"), "spinal cord")
-eqOrThrow(attemptToNormalizeString("Indonesia"), "indonesia")
+eqOrThrow(attemptToNormalizeString("Hera"), "accept hera")
+eqOrThrow(attemptToNormalizeString("spinal cord"), "accept spinal cord")
+eqOrThrow(attemptToNormalizeString("Indonesia"), "accept indonesia")
 eqOrThrow(
   attemptToNormalizeString(
     "Sandro Botticelli [or Alessandro di Mariano di Vanni Filipepi]"
   ),
-  "Sandro Botticelli accept Alessandro di Mariano di Vanni Filipepi"
+  "accept Sandro Botticelli accept Alessandro di Mariano di Vanni Filipepi"
 )
 eqOrThrow(
   attemptToNormalizeString(
     "Battle of Trafalgar &lt;JG, European/British History&gt;"
   ),
-  "Battle of Trafalgar"
+  "accept Battle of Trafalgar"
 )
 eqOrThrow(
   attemptToNormalizeString(
     'neoconservatism [accept word forms; do not accept or prompt on "conservatism"]'
   ),
-  "neoconservatism DNA on conservatism"
+  "accept neoconservatism DNA on conservatism"
 )
-eqOrThrow(attemptToNormalizeString("Egypt"), "egypt")
+eqOrThrow(attemptToNormalizeString("Egypt"), "accept egypt")
 eqOrThrow(
   attemptToNormalizeString(
     "Constantine I [accept Constantine the Great; prompt on Constantine] &lt;Other History, DC&gt;&lt;ed. AH&gt;"
   ),
-  "Constantine I accept Constantine the Great prompt Constantine"
+  "accept Constantine I accept Constantine the Great prompt Constantine"
 )
 eqOrThrow(
   attemptToNormalizeString("Francisco JosÃ© de Goya y Lucientes"),
-  "Francisco JosÃ© de Goya y Lucientes"
+  "accept Francisco JosÃ© de Goya y Lucientes"
 )
 eqOrThrow(
   attemptToNormalizeString("function [or method; or procedure; or subroutine]"),
-  "function accept method accept procedure accept subroutine"
+  "accept function accept method accept procedure accept subroutine"
 )
 eqOrThrow(
   attemptToNormalizeString("Winston Leonard Spencer-Churchill"),
-  "Winston Leonard Spencer-Churchill"
+  "accept Winston Leonard Spencer-Churchill"
 )
-eqOrThrow(attemptToNormalizeString("volume &lt;MS&gt;"), "volume")
-eqOrThrow(attemptToNormalizeString("Colorado"), "Colorado")
-eqOrThrow(attemptToNormalizeString("The Fray"), "The Fray")
+eqOrThrow(attemptToNormalizeString("volume &lt;MS&gt;"), "accept volume")
+eqOrThrow(attemptToNormalizeString("Colorado"), "accept Colorado")
+eqOrThrow(attemptToNormalizeString("The Fray"), "accept The Fray")
 eqOrThrow(
   attemptToNormalizeString("Charlotte Bronte [accept Currer Bell]"),
-  "Charlotte Bronte accept Currer Bell"
+  "accept Charlotte Bronte accept Currer Bell"
 )
 eqOrThrow(
   attemptToNormalizeString("Emily Elizabeth Dickinson"),
-  "Emily Elizabeth Dickinson"
+  "accept Emily Elizabeth Dickinson"
 )
 eqOrThrow(
   attemptToNormalizeString(
     "seeds [prompt on embryos; prompt on fruit] &lt;JR&gt;"
   ),
-  "seeds prompt embryos prompt fruit"
+  "accept seeds prompt embryos prompt fruit"
 )
 eqOrThrow(
   attemptToNormalizeString(
     "The Ring Cycle [or The Ring of the Nibelungs; or Der Ring des Nibelungen]"
   ),
-  "The Ring Cycle accept The Ring of the Nibelungs accept Der Ring des Nibelungen"
+  "accept The Ring Cycle accept The Ring of the Nibelungs accept Der Ring des Nibelungen"
 )
 
 eqOrThrow(
   attemptToNormalizeString("Joan of Arc or Jeanne d'Arc"),
-  "Joan of Arc accept Jeanne d'Arc"
+  "accept Joan of Arc accept Jeanne d'Arc"
 )
-eqOrThrow(attemptToNormalizeString("Stanley Milgram"), "Stanley Milgram")
+eqOrThrow(attemptToNormalizeString("Stanley Milgram"), "accept Stanley Milgram")
 eqOrThrow(
   attemptToNormalizeString("The Republic [or Politeia]"),
-  "The Republic accept Politeia"
+  "accept The Republic accept Politeia"
 )
 eqOrThrow(
   attemptToNormalizeString("Humphrey DeForest Bogart"),
-  "Humphrey DeForest Bogart"
+  "accept Humphrey DeForest Bogart"
 )
-eqOrThrow(attemptToNormalizeString("Electrons"), "Electrons")
-eqOrThrow(attemptToNormalizeString("I and the Village"), "I and the Village")
-eqOrThrow(attemptToNormalizeString("Paradise Lost"), "Paradise Lost")
+eqOrThrow(attemptToNormalizeString("Electrons"), "accept Electrons")
+eqOrThrow(
+  attemptToNormalizeString("I and the Village"),
+  "accept I and the Village"
+)
+eqOrThrow(attemptToNormalizeString("Paradise Lost"), "accept Paradise Lost")
 
 eqOrThrow(
   attemptToNormalizeString(
     "Mexico [or United Mexican States; or Estados Unidos Mexicanos]"
   ),
-  "Mexico accept United Mexican States accept Estados Unidos Mexicanos"
+  "accept Mexico accept United Mexican States accept Estados Unidos Mexicanos"
 )
 eqOrThrow(
   attemptToNormalizeString("the square root of 674 units"),
-  "the square root of 674 units"
+  "accept the square root of 674 units"
 )
 eqOrThrow(
   attemptToNormalizeString("United Kingdom [or Great Britain]"),
-  "United Kingdom accept Great Britain"
+  "accept United Kingdom accept Great Britain"
 )
 eqOrThrow(
   attemptToNormalizeString(
     "Night of the Long Knives [or Nacht der langen Messer]"
   ),
-  "Night of the Long Knives accept Nacht der langen Messer"
+  "accept Night of the Long Knives accept Nacht der langen Messer"
 )
 
-eqOrThrow(attemptToNormalizeString("Wales [or Cymru]"), "Wales accept Cymru")
-eqOrThrow(attemptToNormalizeString("Uranus"), "Uranus")
+eqOrThrow(
+  attemptToNormalizeString("Wales [or Cymru]"),
+  "accept Wales accept Cymru"
+)
+eqOrThrow(attemptToNormalizeString("Uranus"), "accept Uranus")
 eqOrThrow(
   attemptToNormalizeString("Jean Jacques Rousseau"),
-  "Jean Jacques Rousseau"
+  "accept Jean Jacques Rousseau"
 )
-eqOrThrow(attemptToNormalizeString("Seven Years' War"), "Seven Years' War")
+eqOrThrow(
+  attemptToNormalizeString("Seven Years' War"),
+  "accept Seven Years' War"
+)
 eqOrThrow(
   attemptToNormalizeString("Heisenberg uncertainty principle"),
-  "Heisenberg uncertainty principle"
+  "accept Heisenberg uncertainty principle"
 )
-eqOrThrow(attemptToNormalizeString("mantle"), "mantle")
+eqOrThrow(attemptToNormalizeString("mantle"), "accept mantle")
 eqOrThrow(
   attemptToNormalizeString("Plato [or Platon] &lt;JR&gt;"),
-  "Plato accept Platon"
+  "accept Plato accept Platon"
 )
 eqOrThrow(
   attemptToNormalizeString("Benjamin Harrison [prompt on Harrison]"),
-  "Benjamin Harrison prompt Harrison"
+  "accept Benjamin Harrison prompt Harrison"
 )
 eqOrThrow(
   attemptToNormalizeString("Benito Pablo Juarez"),
-  "Benito Pablo Juarez"
+  "accept Benito Pablo Juarez"
 )
 eqOrThrow(
   attemptToNormalizeString('"To Althea, From Prison"'),
-  "To Althea, From Prison"
+  "accept To Althea, From Prison"
 )
 
 eqOrThrow(
   attemptToNormalizeString("Blah (Blee) Blah (Blu blu)"),
-  "Blah (Blee) Blah blu blu"
+  "accept Blah (Blee) Blah blu blu"
+)
+eqOrThrow(
+  attemptToNormalizeString("C(Live) S(taples) Lewis"),
+  "accept C(Live) S(taples) Lewis"
 )
 
 // eqOrThrow(
