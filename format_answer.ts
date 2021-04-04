@@ -1,7 +1,9 @@
 // i need to have it extend the grace period after a buzz after the end of the Q
 // if it's wrong and spelled wrong i'll just prompt for you to type it correctly
-// The right answer was Jean Auguste Dominique <strong>Ingres</strong> &lt;Visual Arts, GY&gt;&lt;ed. AH&gt;
 // i shuold add a feature for adding new trivia questions
+
+// is that for an answer like "Mohs scale"
+// all you need is "mohs" because "scale" already came up in the question
 
 var dictionary = require("dictionary-en")
 import NSpell from "nspell"
@@ -61,6 +63,7 @@ export const attemptToNormalizeString = (ans: string): string => {
   ans = ans.replace("do not accept or prompt", "DNA")
   ans = ans.replace(/ or/g, " accept")
   ans = ans.replace(/or /g, "accept ")
+  ans = ans.replace(/-/g, " ")
   ans = ans.replace("do not accept", "DNA")
 
   // Yes, they are different!!!
@@ -348,6 +351,7 @@ export const isAnswerCorrect = (
   }
 ): "correct" | "prompt" | "prompt-of" | "no" => {
   given = given.toLowerCase()
+  given = given.replace(/-/g, " ")
   let officialAnswers = official.answers
   let prompts = official.prompts ?? []
 
@@ -503,12 +507,14 @@ function onLoadDictionary(err: any, dict: any) {
   test("Mario Vargas Llosa", "vargas ", "prompt")
   test("Mario Vargas Llosa", "vargas blah", "prompt")
 
-  // test("Japanese-Americans", "Japanese", "prompt")
-  // test("Japanese-Americans", "Japanese americans")
+  test("Japanese-Americans", "Japanese", "prompt")
+  test("Japanese-Americans", "Japanese americans")
+  test("Japanese-Americans", "Japanese-americans")
+  test("Japanese-Americans", "Japanesesdf-americans", "prompt")
 
-  // test("the burning bush", "bush")
+  test("the burning bush", "bush", "prompt")
 
-  // test("Syrian Arab Republic", "Syria", "correct")
+  test("Syrian Arab Republic", "Syria", "correct")
 }
 
 // neutron should not be accepted for neutrino
@@ -566,7 +572,7 @@ eqOrThrow(
     "The Hunchback of Notre Dame [or Notre-Dame de Paris]"
   ),
 
-  "accept The Hunchback of Notre Dame accept Notre-Dame de Paris"
+  "accept The Hunchback of Notre Dame accept Notre Dame de Paris"
 )
 eqOrThrow(attemptToNormalizeString("cows"), "accept cows")
 eqOrThrow(
@@ -640,7 +646,7 @@ eqOrThrow(
 )
 eqOrThrow(
   attemptToNormalizeString("Winston Leonard Spencer-Churchill"),
-  "accept Winston Leonard Spencer-Churchill"
+  "accept Winston Leonard Spencer Churchill"
 )
 eqOrThrow(attemptToNormalizeString("volume &lt;MS&gt;"), "accept volume")
 eqOrThrow(attemptToNormalizeString("Colorado"), "accept Colorado")
