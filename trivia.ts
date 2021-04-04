@@ -22,7 +22,7 @@ export const getTickTockMessageText = (
     buzzQueue[0].user.username
   }, you have ${seconds} seconds to give an answer.`
 
-  if (buzzQueue.length > 0) {
+  if (buzzQueue.length > 1) {
     const remainingQueue = buzzQueue
       .slice(1)
       .map((b) => b.user.username)
@@ -125,7 +125,7 @@ export const handleTriviaMessages = async (message: Discord.Message) => {
 
     while (
       remainingWords.length > 0 &&
-      answerStatus !== "not-answered-correctly"
+      answerStatus === "not-answered-correctly"
     ) {
       for (let i = 0; i < 4 && remainingWords.length > 0; i++) {
         partialAnswerText += remainingWords.shift() + " "
@@ -138,8 +138,6 @@ export const handleTriviaMessages = async (message: Discord.Message) => {
       for (const buzzer of buzzQueue) {
         partialAnswerText += ` **BUZZ** (${buzzer.user.username}) `
       }
-
-      await questionMessage.edit(partialAnswerText)
 
       answerStatus = await consumeBuzzQueue(
         message,
@@ -208,24 +206,25 @@ export const handleTriviaMessages = async (message: Discord.Message) => {
 const getAnswerFromTopBuzzedUser = async (
   message: Discord.Message
 ): Promise<string | null> => {
+  // Need to clear this out from the previous answer
+  buzzQueue[0].answer = undefined
+
   const tickTockMessage = await message.channel.send(
     getTickTockMessageText(8, buzzQueue[0].type)
   )
 
   const result = await Promise.race([
-    new Promise<string>((resolve) =>
-      setInterval(() => {
-        if (buzzQueue[0].answer) resolve(buzzQueue[0].answer)
-      })
-    ),
-
-    new Promise<null>(async (resolve) => {
+    new Promise<string | null>(async (resolve) => {
       for (let i = 0; i < 4; i++) {
         await sleep(2000)
 
         tickTockMessage.edit(
           getTickTockMessageText(8 - i * 2, buzzQueue[0].type)
         )
+
+        if (buzzQueue[0].answer) {
+          resolve(buzzQueue[0].answer)
+        }
       }
 
       resolve(null)
@@ -270,8 +269,10 @@ const consumeBuzzQueue = async (
 
         return "answered-correctly"
       } else if (result === "prompt") {
+        buzzQueue[0].type = "prompt"
         await message.channel.send(`Close! Give me something more specific`)
       } else if (result === "prompt-of") {
+        buzzQueue[0].type = "prompt"
         await message.channel.send(providedAnswer.trim() + " of ... ?")
       } else {
         await message.channel.send(`That's probably wrong.`)
