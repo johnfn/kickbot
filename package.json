@@ -16,6 +16,7 @@
     "nspell": "^2.1.5"
   },
   "devDependencies": {
-    "@types/nspell": "^2.1.0"
+    "@types/nspell": "^2.1.0",
+    "ts-node": "^9.1.1"
   }
 }
