@@ -236,3 +236,10 @@ const start = async () => {
 }
 
 start()
+
+export const cats = {
+  arts: 21,
+  finearts: 21,
+  farts: 21,
+  geo: 20,
+}

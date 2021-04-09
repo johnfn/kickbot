@@ -7,6 +7,7 @@
 
 var dictionary = require("dictionary-en")
 import NSpell from "nspell"
+import { commonWords } from "./common_words"
 
 dictionary(onLoadDictionary)
 
@@ -285,8 +286,11 @@ export const arePhrasesRoughlyEqual = (
   given: string,
   answer: string
 ): "correct" | "prompt" | "no" => {
-  const givenWords = given.split(" ")
-  const answerWords = answer.split(" ")
+  let givenWords = given.split(" ")
+  let answerWords = answer.split(" ")
+
+  givenWords = givenWords.filter((word) => !commonWords.includes(word))
+  answerWords = answerWords.filter((word) => !commonWords.includes(word))
 
   if (
     givenWords.length === answerWords.length &&
@@ -294,30 +298,6 @@ export const arePhrasesRoughlyEqual = (
       areWordsRoughlyEqual(givenWords[i], answerWords[i])
     )
   ) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual("the " + given, answer)) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual(given, "the " + answer)) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual("a " + given, answer)) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual(given, "a " + answer)) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual("an " + given, answer)) {
-    return "correct"
-  }
-
-  if (areWordsRoughlyEqual(given, "an " + answer)) {
     return "correct"
   }
 
@@ -332,7 +312,8 @@ export const arePhrasesRoughlyEqual = (
   }
 
   if (
-    numMatchingWords >= 2 ||
+    // TODO
+    numMatchingWords >= 1 ||
     (numMatchingWords === 1 && answer.split(" ").length === 1)
   ) {
     return "correct"

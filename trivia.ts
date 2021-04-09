@@ -1,3 +1,5 @@
+// speedrun mode
+
 import Discord = require("discord.js")
 import { getChipsTossup } from "./chips_tossups"
 import { formatAnswer, isAnswerCorrect, OfficialAnswer } from "./format_answer"
