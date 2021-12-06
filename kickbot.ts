@@ -53,6 +53,21 @@ export const save = () => {
   fs.writeFileSync("save/save.json", JSON.stringify(persistentData, null, 2))
 }
 
+const countdownUntil = (date: Date) => {
+  /**
+   * Prints the number of days, hours and minutes until the provided date.
+   */
+
+  const now = new Date()
+  const diff = date.getTime() - now.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+  return `${days} days, ${hours} hours, ${minutes} minutes and ${seconds} seconds until grant sees amy again`
+}
+
 // const reactWithNumber = async (message: Discord.Message, number: number) => {
 //   let strs = String(number).split("")
 //   let numToEmoji: { [key: string]: string } = {
@@ -73,161 +88,162 @@ export const save = () => {
 //   }
 // }
 
-client.on(
-  "message",
-  async (message): Promise<void> => {
-    if (message.author.bot) {
-      return
-    }
+client.on("message", async (message): Promise<void> => {
+  if (message.author.bot) {
+    return
+  }
 
-    const msg = message.content
+  const msg = message.content
 
-    handleRpgMessages(message)
-    await handleTriviaMessages(message)
+  if (msg === "!timeleft") {
+    await message.channel.send(countdownUntil(new Date(2021, 11, 19, 16, 15)))
+  }
 
-    for (const [emoji, code] of Object.entries(emojiToConditionCode)) {
-      if (satisfiesCondition(message, code)) {
-        await message.react(emoji)
-      }
-    }
+  handleRpgMessages(message)
+  await handleTriviaMessages(message)
 
-    if (message.content.toLowerCase() === "!loottesting") {
-      await loot(message.author, message.channel)
-    }
-
-    if (message.content.toLowerCase() === "!inventory") {
-      const myInventory =
-        persistentData.inventories[message.author.username] ?? []
-      const myPoints = persistentData.scores[message.author.username] ?? 0
-
-      if (myInventory.length === 0) {
-        await message.channel.send(
-          "Inventory:\n\n```" + `${myPoints} points` + "```"
-        )
-      } else {
-        await message.channel.send(
-          "Inventory:\n\n```" +
-            `${myPoints} points\n` +
-            myInventory.join("\n") +
-            "```\n\nInspect an item with `!inspect [item name]`."
-        )
-      }
-    }
-
-    if (message.content.toLowerCase().startsWith("!inspect")) {
-      const inspectedItem = message.content.split(" ").slice(1).join(" ")
-      const myInventory =
-        persistentData.inventories[message.author.username] ?? []
-
-      if (
-        !myInventory.find(
-          (item) => item.toLowerCase() === inspectedItem.toLowerCase()
-        )
-      ) {
-        await message.channel.send(
-          `You don't have an item named ${inspectedItem} in your inventory!\n\nUse \`!inventory\` to see the contents of your inventory.`
-        )
-        return
-      }
-
-      for (const [name, desc] of Object.entries(lootDescriptions)) {
-        if (name.toLowerCase() === inspectedItem.toLowerCase()) {
-          await message.channel.send(`\`${name}\`\n\n${desc}`)
-
-          return
-        }
-      }
-    }
-
-    if (message.content.startsWith("!newcondition")) {
-      let emoji = message.content.split(" ")[1]
-
-      const code = message.content.slice(
-        message.content.indexOf("```") + 3,
-        message.content.lastIndexOf("```")
-      )
-
-      emojiToConditionCode[emoji] = code
-
-      await message.channel.send(
-        "Hi! Updating my condition for " + emoji + " to ```" + code + "```"
-      )
-    }
-
-    if (
-      (message.content.toLowerCase().startsWith("i'm ") ||
-        message.content.toLowerCase().startsWith("im ")) &&
-      Math.random() > 0.7
-    ) {
-      const r = Math.floor(Math.random() * 10)
-
-      if (r === 0) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! I'm bot :slight_smile: "
-        )
-      } else if (r === 1) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! egg! "
-        )
-      } else if (r === 2) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! Nice to meet you! I'm bot. "
-        )
-      } else if (r === 3) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! :slight_smile: "
-        )
-      } else if (r === 4) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! You know what im gonna say next "
-        )
-      } else if (r === 5) {
-        const m = await message.channel.send(
-          "Hi " +
-            msg.slice(3).trim() +
-            "! You know what im gonna say next :slight_smile:"
-        )
-      } else if (r === 6) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! I'm scrambie! no wait..."
-        )
-      } else if (r === 7) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "! I'm bot! beep boop im a robot"
-        )
-      } else if (r === 8) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "!!! >:D "
-        )
-      } else if (r === 9) {
-        const m = await message.channel.send(
-          "Hi " + msg.slice(3).trim() + "!!! I'm bot"
-        )
-      }
-    }
-
-    if (
-      message.content.toLowerCase().startsWith("hi ") &&
-      message.content.length > 5
-    ) {
-      const words = message.content.split(" ")
-      const newName = words.slice(1).join(" ") ?? ""
-
-      try {
-        message.guild?.me?.setNickname(newName.slice(0, 31))
-        const m = await message.channel.send(
-          `hi ${message.author.username}! thanks for greeting me :slight_smile: `
-        )
-      } catch (e) {
-        console.log(e)
-      }
-    }
-
-    if (message.content.indexOf(config.prefix) !== 0) {
-      return
+  for (const [emoji, code] of Object.entries(emojiToConditionCode)) {
+    if (satisfiesCondition(message, code)) {
+      await message.react(emoji)
     }
   }
-)
+
+  if (message.content.toLowerCase() === "!loottesting") {
+    await loot(message.author, message.channel)
+  }
+
+  if (message.content.toLowerCase() === "!inventory") {
+    const myInventory =
+      persistentData.inventories[message.author.username] ?? []
+    const myPoints = persistentData.scores[message.author.username] ?? 0
+
+    if (myInventory.length === 0) {
+      await message.channel.send(
+        "Inventory:\n\n```" + `${myPoints} points` + "```"
+      )
+    } else {
+      await message.channel.send(
+        "Inventory:\n\n```" +
+          `${myPoints} points\n` +
+          myInventory.join("\n") +
+          "```\n\nInspect an item with `!inspect [item name]`."
+      )
+    }
+  }
+
+  if (message.content.toLowerCase().startsWith("!inspect")) {
+    const inspectedItem = message.content.split(" ").slice(1).join(" ")
+    const myInventory =
+      persistentData.inventories[message.author.username] ?? []
+
+    if (
+      !myInventory.find(
+        (item) => item.toLowerCase() === inspectedItem.toLowerCase()
+      )
+    ) {
+      await message.channel.send(
+        `You don't have an item named ${inspectedItem} in your inventory!\n\nUse \`!inventory\` to see the contents of your inventory.`
+      )
+      return
+    }
+
+    for (const [name, desc] of Object.entries(lootDescriptions)) {
+      if (name.toLowerCase() === inspectedItem.toLowerCase()) {
+        await message.channel.send(`\`${name}\`\n\n${desc}`)
+
+        return
+      }
+    }
+  }
+
+  if (message.content.startsWith("!newcondition")) {
+    let emoji = message.content.split(" ")[1]
+
+    const code = message.content.slice(
+      message.content.indexOf("```") + 3,
+      message.content.lastIndexOf("```")
+    )
+
+    emojiToConditionCode[emoji] = code
+
+    await message.channel.send(
+      "Hi! Updating my condition for " + emoji + " to ```" + code + "```"
+    )
+  }
+
+  if (
+    (message.content.toLowerCase().startsWith("i'm ") ||
+      message.content.toLowerCase().startsWith("im ")) &&
+    Math.random() > 0.7
+  ) {
+    const r = Math.floor(Math.random() * 10)
+
+    if (r === 0) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! I'm bot :slight_smile: "
+      )
+    } else if (r === 1) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! egg! "
+      )
+    } else if (r === 2) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! Nice to meet you! I'm bot. "
+      )
+    } else if (r === 3) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! :slight_smile: "
+      )
+    } else if (r === 4) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! You know what im gonna say next "
+      )
+    } else if (r === 5) {
+      const m = await message.channel.send(
+        "Hi " +
+          msg.slice(3).trim() +
+          "! You know what im gonna say next :slight_smile:"
+      )
+    } else if (r === 6) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! I'm scrambie! no wait..."
+      )
+    } else if (r === 7) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "! I'm bot! beep boop im a robot"
+      )
+    } else if (r === 8) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "!!! >:D "
+      )
+    } else if (r === 9) {
+      const m = await message.channel.send(
+        "Hi " + msg.slice(3).trim() + "!!! I'm bot"
+      )
+    }
+  }
+
+  if (
+    message.content.toLowerCase().startsWith("hi ") &&
+    message.content.length > 5
+  ) {
+    const words = message.content.split(" ")
+    const newName = words.slice(1).join(" ") ?? ""
+
+    try {
+      message.guild?.me?.setNickname(newName.slice(0, 31))
+      const m = await message.channel.send(
+        `hi ${message.author.username}! thanks for greeting me :slight_smile: `
+      )
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  if (message.content.indexOf(config.prefix) !== 0) {
+    return
+  }
+})
 
 const start = async () => {
   // if (process.env.NODE_APP_INSTANCE === "0") {

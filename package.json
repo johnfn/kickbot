@@ -1,7 +1,6 @@
 {
   "name": "kickbot",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -18,5 +17,14 @@
   "devDependencies": {
     "@types/nspell": "^2.1.0",
     "ts-node": "^9.1.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnfn/kickbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/johnfn/kickbot/issues"
+  },
+  "homepage": "https://github.com/johnfn/kickbot#readme",
+  "description": ""
 }
